@@ -1,0 +1,237 @@
+# Music Library Management System - .gitignore
+
+# ========================================
+# Python Virtual Environments
+# ========================================
+# Platform-specific virtual environments
+music_env/
+music_env_*/
+music_env_windows/
+music_env_darwin/
+music_env_linux/
+music_env_macos/
+
+# ========================================
+# Python Cache and Compiled Files
+# ========================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# ========================================
+# Python Virtual Environment (Generic)
+# ========================================
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# ========================================
+# IDE and Editor Files
+# ========================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ========================================
+# Log Files
+# ========================================
+*.log
+music_library.log
+logs/
+
+# ========================================
+# Database and Data Files
+# ========================================
+# Music catalog database (contains user's music data)
+mayi-music-list.json
+mayi-music-list-backup-*.json
+
+# ========================================
+# User Music Content
+# ========================================
+# These directories contain user's music files
+Library/
+New/
+Duplicate/
+Trash/
+
+# ========================================
+# Generated Thumbnails
+# ========================================
+# Thumbnail images extracted from music files
+thumbnails/
+*.jpg
+*.jpeg
+*.png
+*.gif
+
+# ========================================
+# Temporary Files
+# ========================================
+*.tmp
+*.temp
+*.bak
+*.backup
+*.old
+
+# ========================================
+# OS Generated Files
+# ========================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ========================================
+# Flask Development Files
+# ========================================
+instance/
+.webassets-cache
+
+# ========================================
+# Environment Variables
+# ========================================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# ========================================
+# Backup Files
+# ========================================
+*.backup
+*.bak
+*.old
+*~
+
+# ========================================
+# Audio Files (for safety)
+# ========================================
+# Uncomment if you want to ignore audio files in the project
+# *.mp3
+# *.flac
+# *.m4a
+# *.wav
+# *.aac
+# *.ogg
+# *.wma
+
+# ========================================
+# Documentation Build
+# ========================================
+docs/_build/
+site/
+
+# ========================================
+# Coverage Reports
+# ========================================
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# ========================================
+# Jupyter Notebook
+# ========================================
+.ipynb_checkpoints
+
+# ========================================
+# pyenv
+# ========================================
+.python-version
+
+# ========================================
+# pipenv
+# ========================================
+Pipfile.lock
+
+# ========================================
+# PEP 582
+# ========================================
+__pypackages__/
+
+# ========================================
+# Celery
+# ========================================
+celerybeat-schedule
+celerybeat.pid
+
+# ========================================
+# SageMath parsed files
+# ========================================
+*.sage.py
+
+# ========================================
+# Spyder project settings
+# ========================================
+.spyderproject
+.spyproject
+
+# ========================================
+# Rope project settings
+# ========================================
+.ropeproject
+
+# ========================================
+# mkdocs documentation
+# ========================================
+/site
+
+# ========================================
+# mypy
+# ========================================
+.mypy_cache/
+.dmypy.json
+dmypy.json

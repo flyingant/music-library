@@ -1,0 +1,33 @@
+# Core dependencies
+mutagen>=1.45.0
+Pillow>=9.0.0
+
+# Optional dependencies for enhanced functionality
+# These are not strictly required but provide better metadata extraction
+# and image processing capabilities
+
+# For better audio metadata extraction
+# mutagen is included above
+
+# For image processing and thumbnail generation
+# Pillow is included above
+
+# For web interface (optional)
+flask>=2.0.0
+flask-cors>=3.0.0
+
+# For database support (optional)
+# sqlite3 (built-in with Python)
+# sqlalchemy>=1.4.0
+
+# For advanced audio processing (optional)
+pydub>=0.25.1
+
+# For better JSON handling (optional)
+ujson>=5.0.0
+
+# For progress bars (optional)
+tqdm>=4.60.0
+
+# For configuration management (optional)
+pyyaml>=5.4.0
