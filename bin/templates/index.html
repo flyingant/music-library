@@ -642,6 +642,9 @@
                     <button class="btn btn-secondary" onclick="scanLibrary()">
                         Scan Library
                     </button>
+                    <button class="btn btn-secondary" onclick="checkDuplicates()">
+                        Check Duplicate
+                    </button>
                 </div>
                 
                 <!-- Filters Panel -->
@@ -1188,7 +1191,20 @@
                 if (!response.ok) {
                     throw new Error('Failed to add music');
                 }
-                alert('Adding music files started. Check the console for progress.');
+                const result = await response.json();
+                
+                if (result.success) {
+                    let message = result.message;
+                    if (result.added_count > 0 || result.moved_to_duplicates > 0) {
+                        message += '\n\nLibrary has been updated.';
+                        // Reload the music library to reflect changes
+                        loadMusic();
+                        loadStats();
+                    }
+                    alert(message);
+                } else {
+                    alert(`Error adding music: ${result.error}`);
+                }
             } catch (error) {
                 console.error('Error adding music:', error);
                 alert('Error adding music files');
@@ -1202,10 +1218,71 @@
                 if (!response.ok) {
                     throw new Error('Failed to scan library');
                 }
-                alert('Library scan started. This may take a while.');
+                const result = await response.json();
+                
+                if (result.success) {
+                    let message = `Library scan completed!\n\n`;
+                    message += `New songs found: ${result.new_songs}\n`;
+                    message += `Thumbnail info updated: ${result.updated_thumbnails}\n`;
+                    message += `Total songs: ${result.total_songs}\n`;
+                    
+                    if (result.moved_to_trash > 0) {
+                        message += `Files moved to trash: ${result.moved_to_trash}\n`;
+                    }
+                    
+                    if (result.new_songs > 0 || result.updated_thumbnails > 0) {
+                        message += `\nCatalog has been updated.`;
+                        // Reload the music library to reflect changes
+                        loadMusic();
+                        loadStats();
+                    }
+                    
+                    alert(message);
+                } else {
+                    alert(`Error scanning library: ${result.error}`);
+                }
             } catch (error) {
                 console.error('Error scanning library:', error);
                 alert('Error scanning library');
+            }
+        }
+        
+        // Check duplicates
+        async function checkDuplicates() {
+            try {
+                const response = await fetch('/api/check-duplicates', {
+                    method: 'POST'
+                });
+                if (!response.ok) {
+                    throw new Error('Failed to check duplicates');
+                }
+                const result = await response.json();
+                
+                if (result.success) {
+                    let message = `Duplicate check completed!\n\n`;
+                    message += `Files checked: ${result.total_files_checked}\n`;
+                    message += `Duplicate groups found: ${result.duplicate_groups}\n`;
+                    message += `Files moved to duplicate folder: ${result.moved_files}\n`;
+                    message += `(All files in duplicate groups were moved)\n`;
+                    
+                    if (result.failed_moves > 0) {
+                        message += `Failed moves: ${result.failed_moves}\n`;
+                    }
+                    
+                    if (result.moved_files > 0) {
+                        message += `\nCatalog has been updated.`;
+                        // Reload the music library to reflect changes
+                        loadMusic();
+                        loadStats();
+                    }
+                    
+                    alert(message);
+                } else {
+                    alert(`Error checking duplicates: ${result.error}`);
+                }
+            } catch (error) {
+                console.error('Error checking duplicates:', error);
+                alert('Error checking duplicates');
             }
         }
         

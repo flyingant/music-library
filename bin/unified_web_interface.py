@@ -298,6 +298,110 @@ class MusicLibraryManager:
         
         return duplicates
     
+    def check_duplicates_in_library(self):
+        """Check for duplicates in the library based on name and format rules"""
+        try:
+            library_path = Path(CONFIG['library_path'])
+            duplicate_groups = []
+            moved_files = []
+            failed_moves = []
+            
+            # Get all music files in library
+            music_files = []
+            for file_path in library_path.rglob('*'):
+                if file_path.is_file() and file_path.suffix.lower() in CONFIG['supported_formats']:
+                    music_files.append(file_path)
+            
+            # Group files by normalized name (case-insensitive, without extension)
+            name_groups = {}
+            for file_path in music_files:
+                # Get filename without extension
+                filename_stem = file_path.stem
+                # Normalize to lowercase for comparison
+                normalized_name = filename_stem.lower()
+                
+                if normalized_name not in name_groups:
+                    name_groups[normalized_name] = []
+                name_groups[normalized_name].append(file_path)
+            
+            # Find groups with multiple files (potential duplicates)
+            for normalized_name, files in name_groups.items():
+                if len(files) > 1:
+                    # This is a potential duplicate group
+                    duplicate_group = {
+                        'normalized_name': normalized_name,
+                        'files': files,
+                        'formats': [f.suffix.lower() for f in files],
+                        'moved_files': []
+                    }
+                    
+                    # Check if files have different formats or different case
+                    formats = set(f.suffix.lower() for f in files)
+                    names = set(f.stem for f in files)
+                    
+                    # Rule 1: Same name but different format
+                    # Rule 2: Same name but different uppercase and lowercase
+                    if len(formats) > 1 or len(names) > 1:
+                        # These are duplicates according to our rules
+                        duplicate_groups.append(duplicate_group)
+                        
+                        # Move ALL files in the duplicate group to duplicate folder
+                        for file_path in files:
+                            try:
+                                # Create duplicate folder path
+                                duplicate_path = Path(CONFIG['duplicate_path']) / file_path.name
+                                
+                                # Handle filename conflicts in duplicate folder
+                                counter = 1
+                                original_duplicate_path = duplicate_path
+                                while duplicate_path.exists():
+                                    name_parts = original_duplicate_path.stem, f"({counter})", original_duplicate_path.suffix
+                                    duplicate_path = original_duplicate_path.parent / f"{name_parts[0]}{name_parts[1]}{name_parts[2]}"
+                                    counter += 1
+                                
+                                # Move file to duplicate folder
+                                shutil.move(str(file_path), str(duplicate_path))
+                                moved_files.append({
+                                    'original_path': str(file_path),
+                                    'duplicate_path': str(duplicate_path),
+                                    'reason': f"Part of duplicate group: {', '.join([f.name for f in files])}"
+                                })
+                                
+                                # Remove from catalog since it's now in duplicate folder
+                                self.catalog['songs'] = [
+                                    song for song in self.catalog['songs'] 
+                                    if song.get('file_path') != str(file_path)
+                                ]
+                                
+                                duplicate_group['moved_files'].append(str(duplicate_path))
+                                logger.info(f"Moved file from duplicate group to duplicate folder: {file_path.name} -> {duplicate_path.name}")
+                                
+                            except Exception as e:
+                                failed_moves.append({
+                                    'file_path': str(file_path),
+                                    'error': str(e)
+                                })
+                                logger.error(f"Failed to move duplicate {file_path.name}: {e}")
+            
+            # Save updated catalog
+            if moved_files:
+                self.save_catalog()
+                logger.info(f"Duplicate check completed: {len(moved_files)} files from duplicate groups moved to duplicate folder")
+            
+            return {
+                'success': True,
+                'duplicate_groups': len(duplicate_groups),
+                'moved_files': len(moved_files),
+                'failed_moves': len(failed_moves),
+                'moved_file_details': moved_files,
+                'failed_move_details': failed_moves,
+                'total_files_checked': len(music_files)
+            }
+            
+        except Exception as e:
+            logger.error(f"Error checking duplicates: {e}")
+            return {'success': False, 'error': str(e)}
+    
     def add_music_file(self, file_path):
         """Add a music file to the library"""
         try:
@@ -308,16 +412,55 @@ class MusicLibraryManager:
             if not metadata or not metadata.get('title'):
                 raise Exception("Failed to extract essential metadata")
             
-            # Check for duplicates
-            duplicates = self.find_duplicates(file_path, metadata)
+            # Check for duplicates by comparing with existing files in library
+            # First, check by file hash (exact duplicates)
+            file_hash = metadata.get('file_hash')
+            exact_duplicates = []
+            if file_hash:
+                for song in self.catalog['songs']:
+                    if song.get('file_hash') == file_hash:
+                        exact_duplicates.append(song)
             
-            if duplicates:
+            # Also check for name-based duplicates (same name, different format/case)
+            filename_stem = Path(file_path).stem
+            normalized_name = filename_stem.lower()
+            name_duplicates = []
+            
+            for song in self.catalog['songs']:
+                song_path = Path(song.get('file_path', ''))
+                if song_path.exists():
+                    song_stem = song_path.stem
+                    song_normalized = song_stem.lower()
+                    if song_normalized == normalized_name:
+                        name_duplicates.append(song)
+            
+            # Combine all duplicates
+            all_duplicates = exact_duplicates + name_duplicates
+            
+            if all_duplicates:
                 # Move to duplicate folder
                 duplicate_path = Path(CONFIG['duplicate_path']) / Path(file_path).name
+                
+                # Handle filename conflicts in duplicate folder
+                counter = 1
+                original_duplicate_path = duplicate_path
+                while duplicate_path.exists():
+                    name_parts = original_duplicate_path.stem, f"({counter})", original_duplicate_path.suffix
+                    duplicate_path = original_duplicate_path.parent / f"{name_parts[0]}{name_parts[1]}{name_parts[2]}"
+                    counter += 1
+                
                 shutil.move(file_path, duplicate_path)
                 metadata['file_path'] = str(duplicate_path)
                 metadata['status'] = 'duplicate'
-                logger.info(f"Duplicate found: {file_path}")
+                logger.info(f"Duplicate found during add: {file_path} -> {duplicate_path}")
+                
+                return {
+                    'success': True,
+                    'metadata': metadata,
+                    'duplicates': all_duplicates,
+                    'status': 'duplicate',
+                    'moved_to_duplicate': str(duplicate_path)
+                }
             else:
                 # Move to library
                 library_path = Path(CONFIG['library_path']) / Path(file_path).name
@@ -330,13 +473,13 @@ class MusicLibraryManager:
                 self.catalog['songs'].append(metadata)
                 self.save_catalog()
                 logger.info(f"Added to library: {file_path} - Catalog updated and saved")
-            
-            return {
-                'success': True,
-                'metadata': metadata,
-                'duplicates': duplicates,
-                'status': metadata.get('status', 'unknown')
-            }
+                
+                return {
+                    'success': True,
+                    'metadata': metadata,
+                    'duplicates': [],
+                    'status': 'library'
+                }
             
         except Exception as e:
             # File processing failed - move to trash
@@ -584,6 +727,12 @@ def upload_file():
 def scan_library():
     """Scan the library"""
     result = manager.scan_library()
+    return jsonify(result)
+
+@app.route('/api/check-duplicates', methods=['POST'])
+def check_duplicates():
+    """Check for duplicates in the library"""
+    result = manager.check_duplicates_in_library()
     return jsonify(result)
 
 
