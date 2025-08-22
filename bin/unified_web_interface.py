@@ -1372,10 +1372,99 @@ class MusicLibraryManager:
         
         return duplicates
     
+    def _is_catalog_entry_valid(self, song, library_path, duplicate_path):
+        """Check if a catalog entry is valid (file exists in correct location)"""
+        file_path = song.get('file_path')
+        status = song.get('status', 'library')
+        
+        if not file_path:
+            return False
+            
+        file_path_obj = Path(file_path)
+        
+        # Check if file exists
+        if not file_path_obj.exists():
+            logger.warning(f"Removing catalog entry for non-existent file: {file_path}")
+            return False
+        
+        # Check if status matches location
+        if status == 'library':
+            # Should be in library folder
+            try:
+                file_path_obj.relative_to(library_path)
+                return True
+            except ValueError:
+                # File is not in library folder but marked as library - invalid
+                logger.warning(f"Removing catalog entry for file outside library marked as 'library': {file_path}")
+                return False
+        elif status == 'duplicate':
+            # Should be in duplicate folder
+            try:
+                file_path_obj.relative_to(duplicate_path)
+                return True
+            except ValueError:
+                # File is not in duplicate folder but marked as duplicate - invalid
+                logger.warning(f"Removing catalog entry for file outside duplicate folder marked as 'duplicate': {file_path}")
+                return False
+        
+        # Unknown status - keep for now
+        return True
+    
+    def sync_catalog_with_filesystem(self):
+        """Synchronize catalog entries with actual filesystem state"""
+        try:
+            library_path = Path(CONFIG['library_path'])
+            duplicate_path = Path(CONFIG['duplicate_path'])
+            
+            # Clean up invalid entries
+            original_size = len(self.catalog['songs'])
+            self.catalog['songs'] = [
+                song for song in self.catalog['songs']
+                if self._is_catalog_entry_valid(song, library_path, duplicate_path)
+            ]
+            cleaned_count = original_size - len(self.catalog['songs'])
+            
+            # Update status for files that exist but have wrong status
+            for song in self.catalog['songs']:
+                file_path = Path(song.get('file_path', ''))
+                current_status = song.get('status', 'library')
+                
+                try:
+                    # Check if file is in library folder
+                    file_path.relative_to(library_path)
+                    if current_status != 'library':
+                        song['status'] = 'library'
+                        logger.info(f"Updated status to 'library' for: {file_path}")
+                except ValueError:
+                    try:
+                        # Check if file is in duplicate folder
+                        file_path.relative_to(duplicate_path)
+                        if current_status != 'duplicate':
+                            song['status'] = 'duplicate'
+                            logger.info(f"Updated status to 'duplicate' for: {file_path}")
+                    except ValueError:
+                        # File is in neither location - keep current status
+                        pass
+            
+            if cleaned_count > 0:
+                self.save_catalog()
+                logger.info(f"Catalog sync completed: cleaned {cleaned_count} invalid entries")
+            
+            return {
+                'success': True,
+                'cleaned_entries': cleaned_count,
+                'total_entries': len(self.catalog['songs'])
+            }
+            
+        except Exception as e:
+            logger.error(f"Error syncing catalog: {e}")
+            return {'success': False, 'error': str(e)}
+    
     def check_duplicates_in_library(self):
         """Check for duplicates in the library based on name and format rules"""
         try:
             library_path = Path(CONFIG['library_path'])
+            duplicate_path = Path(CONFIG['duplicate_path'])
             duplicate_groups = []
             moved_files = []
             failed_moves = []
@@ -1385,6 +1474,17 @@ class MusicLibraryManager:
             for file_path in library_path.rglob('*'):
                 if file_path.is_file() and file_path.suffix.lower() in CONFIG['supported_formats']:
                     music_files.append(file_path)
+            
+            # Also clean up catalog - remove entries for files that don't exist
+            # or files that are already in duplicate folder but still tracked as 'library'
+            original_catalog_size = len(self.catalog['songs'])
+            self.catalog['songs'] = [
+                song for song in self.catalog['songs']
+                if self._is_catalog_entry_valid(song, library_path, duplicate_path)
+            ]
+            cleaned_entries = original_catalog_size - len(self.catalog['songs'])
+            if cleaned_entries > 0:
+                logger.info(f"Cleaned up {cleaned_entries} invalid catalog entries")
             
             # Group files by normalized name (case-insensitive, without extension)
             name_groups = {}
@@ -1457,16 +1557,17 @@ class MusicLibraryManager:
                                 })
                                 logger.error(f"Failed to move duplicate {file_path.name}: {e}")
             
-            # Save updated catalog
-            if moved_files:
+            # Save updated catalog if we made any changes
+            if moved_files or cleaned_entries > 0:
                 self.save_catalog()
-                logger.info(f"Duplicate check completed: {len(moved_files)} files from duplicate groups moved to duplicate folder")
+                logger.info(f"Duplicate check completed: {len(moved_files)} files from duplicate groups moved to duplicate folder, {cleaned_entries} catalog entries cleaned up")
             
             return {
                 'success': True,
                 'duplicate_groups': len(duplicate_groups),
                 'moved_files': len(moved_files),
                 'failed_moves': len(failed_moves),
+                'cleaned_catalog_entries': cleaned_entries,
                 'moved_file_details': moved_files,
                 'failed_move_details': failed_moves,
                 'total_files_checked': len(music_files)
@@ -1526,7 +1627,12 @@ class MusicLibraryManager:
                 shutil.move(file_path, duplicate_path)
                 metadata['file_path'] = str(duplicate_path)
                 metadata['status'] = 'duplicate'
-                logger.info(f"Duplicate found during add: {file_path} -> {duplicate_path}")
+                metadata['date_added'] = datetime.now().isoformat()
+                
+                # Add to catalog even though it's a duplicate, for proper tracking
+                self.catalog['songs'].append(metadata)
+                self.save_catalog()
+                logger.info(f"Duplicate found during add: {file_path} -> {duplicate_path} (added to catalog for tracking)")
                 
                 return {
                     'success': True,
@@ -1999,6 +2105,12 @@ def scan_library():
 def check_duplicates():
     """Check for duplicates in the library"""
     result = manager.check_duplicates_in_library()
+    return jsonify(result)
+
+@app.route('/api/sync-catalog', methods=['POST'])
+def sync_catalog():
+    """Synchronize catalog with filesystem state"""
+    result = manager.sync_catalog_with_filesystem()
     return jsonify(result)
 
 @app.route('/api/unlock-music', methods=['POST'])

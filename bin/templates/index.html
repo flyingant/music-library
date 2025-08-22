@@ -697,6 +697,9 @@
             <button class="header-btn" onclick="checkDuplicates()">
                 Check Duplicates
             </button>
+            <button class="header-btn" onclick="syncCatalog()">
+                Sync Catalog
+            </button>
         </div>
     </div>
     
@@ -1312,11 +1315,15 @@
                                         combinedMessage += `Duplicate groups found: ${duplicateResult.duplicate_groups}\n`;
                                         combinedMessage += `Files moved to duplicate folder: ${duplicateResult.moved_files}\n`;
                                         
+                                        if (duplicateResult.cleaned_catalog_entries > 0) {
+                                            combinedMessage += `Catalog entries cleaned up: ${duplicateResult.cleaned_catalog_entries}\n`;
+                                        }
+                                        
                                         if (duplicateResult.failed_moves > 0) {
                                             combinedMessage += `Failed moves: ${duplicateResult.failed_moves}\n`;
                                         }
                                         
-                                        if (duplicateResult.moved_files > 0) {
+                                        if (duplicateResult.moved_files > 0 || duplicateResult.cleaned_catalog_entries > 0) {
                                             shouldReloadLibrary = true;
                                         }
                                     } else {
@@ -1435,7 +1442,10 @@
                     message += `Files checked: ${result.total_files_checked}\n`;
                     message += `Duplicate groups found: ${result.duplicate_groups}\n`;
                     message += `Files moved to duplicate folder: ${result.moved_files}\n`;
-                    message += `(All files in duplicate groups were moved)\n`;
+                    
+                    if (result.cleaned_catalog_entries > 0) {
+                        message += `Catalog entries cleaned up: ${result.cleaned_catalog_entries}\n`;
+                    }
                     
                     if (result.failed_moves > 0) {
                         message += `Failed moves: ${result.failed_moves}\n`;
@@ -1460,6 +1470,55 @@
                 if (duplicatesBtn) {
                     duplicatesBtn.textContent = originalText;
                     duplicatesBtn.disabled = false;
+                }
+            }
+        }
+
+        async function syncCatalog() {
+            // Get button reference
+            const syncBtn = Array.from(document.querySelectorAll('.header-btn')).find(btn => btn.textContent.includes('Sync Catalog'));
+            const originalText = syncBtn ? syncBtn.textContent : 'Sync Catalog';
+            
+            try {
+                // Show loading state
+                if (syncBtn) {
+                    syncBtn.textContent = '⏳ Syncing...';
+                    syncBtn.disabled = true;
+                }
+                
+                const response = await fetch('/api/sync-catalog', {
+                    method: 'POST'
+                });
+                if (!response.ok) {
+                    throw new Error('Failed to sync catalog');
+                }
+                const result = await response.json();
+                
+                if (result.success) {
+                    let message = `Catalog synchronization completed!\n\n`;
+                    message += `Total catalog entries: ${result.total_entries}\n`;
+                    message += `Invalid entries cleaned: ${result.cleaned_entries}\n`;
+                    
+                    if (result.cleaned_entries > 0) {
+                        message += `\nCatalog has been updated to match filesystem state.`;
+                        // Reload the music library to reflect changes
+                        loadMusic();
+                    } else {
+                        message += `\nCatalog was already in sync.`;
+                    }
+                    
+                    alert(message);
+                } else {
+                    alert('Catalog sync failed: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Error syncing catalog:', error);
+                alert('Error syncing catalog: ' + error.message);
+            } finally {
+                // Restore button state
+                if (syncBtn) {
+                    syncBtn.textContent = originalText;
+                    syncBtn.disabled = false;
                 }
             }
         }
