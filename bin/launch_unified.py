@@ -81,7 +81,7 @@ def install_requirements():
 
 def check_dependencies():
     """Check if required dependencies are installed"""
-    required_packages = ['flask', 'flask_cors', 'mutagen', 'PIL']
+    required_packages = ['flask', 'flask_cors', 'mutagen', 'PIL', 'cryptography', 'requests']
     missing_packages = []
     
     for package in required_packages:
@@ -111,6 +111,7 @@ def setup_directories():
         '../New', 
         '../Duplicate',
         '../Trash',
+        '../Unlocked',
         'thumbnails'  # Thumbnails now stored in current directory
     ]
     

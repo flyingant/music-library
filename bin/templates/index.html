@@ -29,12 +29,45 @@
             position: sticky;
             top: 0;
             z-index: 100;
+            flex-wrap: wrap;
+            gap: 12px;
         }
         
         .top-header .title {
             font-size: 16px;
             font-weight: 500;
             color: #333333;
+        }
+        
+        .header-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .header-btn {
+            padding: 8px 12px;
+            border: 2px solid #333333;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: transparent;
+            color: #333333;
+            white-space: nowrap;
+        }
+        
+        .header-btn:hover {
+            background: #333333;
+            color: #ffffff;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .header-btn:active {
+            transform: translateY(0);
         }
         
         .hamburger-menu {
@@ -66,6 +99,8 @@
             border-right: 1px solid #e5e5e5;
             padding: 24px;
         }
+        
+
         
         .sidebar h1 {
             font-size: 20px;
@@ -576,6 +611,24 @@
         
         /* Responsive Design */
         @media (max-width: 768px) {
+            .top-header {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 8px;
+            }
+            
+            .header-actions {
+                justify-content: center;
+                gap: 6px;
+            }
+            
+            .header-btn {
+                padding: 6px 10px;
+                font-size: 11px;
+                flex: 1;
+                min-width: 80px;
+            }
+            
             .main-container {
                 flex-direction: column;
             }
@@ -605,16 +658,45 @@
                 width: 100%;
             }
         }
+        
+        @media (max-width: 480px) {
+            .header-actions {
+                flex-direction: column;
+                width: 100%;
+            }
+            
+            .header-btn {
+                width: 100%;
+                min-width: auto;
+            }
+            
+            .music-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
     <!-- Top Header Bar -->
     <div class="top-header">
         <div class="title">MaYi's Music Library</div>
-        <div class="hamburger-menu">
-            <span></span>
-            <span></span>
-            <span></span>
+        <div class="header-actions">
+            <button class="header-btn" onclick="unlockMusic()">
+                Unlock Music
+            </button>
+            <button class="header-btn" onclick="addMusic()">
+                Add Music + Check Duplicates
+            </button>
+            <button class="header-btn" onclick="scanLibrary()">
+                Scan Library
+            </button>
+            <button class="header-btn" onclick="checkDuplicates()">
+                Check Duplicates
+            </button>
         </div>
     </div>
     
@@ -635,15 +717,6 @@
                     </button>
                     <button class="btn btn-outline" onclick="toggleFilters()">
                         Filter
-                    </button>
-                    <button class="btn btn-secondary" onclick="addMusic()">
-                        Add New Music
-                    </button>
-                    <button class="btn btn-secondary" onclick="scanLibrary()">
-                        Scan Library
-                    </button>
-                    <button class="btn btn-secondary" onclick="checkDuplicates()">
-                        Check Duplicate
                     </button>
                 </div>
                 
@@ -737,6 +810,8 @@
                 </div>
             </div>
         </div>
+        
+
     </div>
     
     <!-- Audio Player -->
@@ -1184,36 +1259,117 @@
             }, 300);
         }
         
-        // Add music
+        // Add music with automatic duplicate checking
         async function addMusic() {
+            // Get button reference
+            const addBtn = Array.from(document.querySelectorAll('.header-btn')).find(btn => btn.textContent.includes('Add Music'));
+            const originalText = addBtn ? addBtn.textContent : 'Add Music + Check Duplicates';
+            
             try {
-                const response = await fetch('/api/library/add');
-                if (!response.ok) {
+                // Show loading state for adding
+                if (addBtn) {
+                    addBtn.textContent = '⏳ Adding...';
+                    addBtn.disabled = true;
+                }
+                
+                // Step 1: Add music files
+                const addResponse = await fetch('/api/library/add');
+                if (!addResponse.ok) {
                     throw new Error('Failed to add music');
                 }
-                const result = await response.json();
+                const addResult = await addResponse.json();
                 
-                if (result.success) {
-                    let message = result.message;
-                    if (result.added_count > 0 || result.moved_to_duplicates > 0) {
-                        message += '\n\nLibrary has been updated.';
-                        // Reload the music library to reflect changes
-                        loadMusic();
-                        loadStats();
+                let combinedMessage = '';
+                let shouldReloadLibrary = false;
+                
+                if (addResult.success) {
+                    combinedMessage += `📁 Add Music Results:\n`;
+                    combinedMessage += addResult.message + '\n';
+                    
+                    if (addResult.added_count > 0 || addResult.moved_to_duplicates > 0) {
+                        shouldReloadLibrary = true;
+                        
+                        // Step 2: Automatically run duplicate check if files were added
+                        if (addResult.added_count > 0) {
+                            // Update button text for duplicate checking phase
+                            if (addBtn) {
+                                addBtn.textContent = '⏳ Checking Duplicates...';
+                            }
+                            
+                            combinedMessage += '\n🔍 Automatically checking for duplicates...\n\n';
+                            
+                            try {
+                                const duplicateResponse = await fetch('/api/check-duplicates', {
+                                    method: 'POST'
+                                });
+                                
+                                if (duplicateResponse.ok) {
+                                    const duplicateResult = await duplicateResponse.json();
+                                    
+                                    if (duplicateResult.success) {
+                                        combinedMessage += `🔍 Duplicate Check Results:\n`;
+                                        combinedMessage += `Files checked: ${duplicateResult.total_files_checked}\n`;
+                                        combinedMessage += `Duplicate groups found: ${duplicateResult.duplicate_groups}\n`;
+                                        combinedMessage += `Files moved to duplicate folder: ${duplicateResult.moved_files}\n`;
+                                        
+                                        if (duplicateResult.failed_moves > 0) {
+                                            combinedMessage += `Failed moves: ${duplicateResult.failed_moves}\n`;
+                                        }
+                                        
+                                        if (duplicateResult.moved_files > 0) {
+                                            shouldReloadLibrary = true;
+                                        }
+                                    } else {
+                                        combinedMessage += `⚠️ Duplicate check failed: ${duplicateResult.error}\n`;
+                                    }
+                                } else {
+                                    combinedMessage += `⚠️ Duplicate check request failed\n`;
+                                }
+                            } catch (duplicateError) {
+                                console.error('Error during duplicate check:', duplicateError);
+                                combinedMessage += `⚠️ Duplicate check error: ${duplicateError.message}\n`;
+                            }
+                        } else {
+                            combinedMessage += '\n(No new files added, skipping duplicate check)\n';
+                        }
+                        
+                        if (shouldReloadLibrary) {
+                            combinedMessage += '\n✅ Library has been updated and refreshed.';
+                            // Reload the music library to reflect all changes
+                            loadMusic();
+                            loadStats();
+                        }
                     }
-                    alert(message);
+                    
+                    alert(combinedMessage);
                 } else {
-                    alert(`Error adding music: ${result.error}`);
+                    alert(`Error adding music: ${addResult.error}`);
                 }
             } catch (error) {
-                console.error('Error adding music:', error);
-                alert('Error adding music files');
+                console.error('Error in add music process:', error);
+                alert('Error during add music process');
+            } finally {
+                // Restore button state
+                if (addBtn) {
+                    addBtn.textContent = originalText;
+                    addBtn.disabled = false;
+                }
             }
         }
         
         // Scan library
         async function scanLibrary() {
+            // Get button reference
+            const scanBtn = Array.from(document.querySelectorAll('.header-btn')).find(btn => btn.textContent.includes('Scan Library'));
+            const originalText = scanBtn ? scanBtn.textContent : 'Scan Library';
+            
             try {
+                // Show loading state
+                if (scanBtn) {
+                    scanBtn.textContent = '⏳ Scanning...';
+                    scanBtn.disabled = true;
+                }
+                
                 const response = await fetch('/api/library/scan');
                 if (!response.ok) {
                     throw new Error('Failed to scan library');
@@ -1244,12 +1400,28 @@
             } catch (error) {
                 console.error('Error scanning library:', error);
                 alert('Error scanning library');
+            } finally {
+                // Restore button state
+                if (scanBtn) {
+                    scanBtn.textContent = originalText;
+                    scanBtn.disabled = false;
+                }
             }
         }
         
         // Check duplicates
         async function checkDuplicates() {
+            // Get button reference
+            const duplicatesBtn = Array.from(document.querySelectorAll('.header-btn')).find(btn => btn.textContent.includes('Check Duplicates'));
+            const originalText = duplicatesBtn ? duplicatesBtn.textContent : 'Check Duplicates';
+            
             try {
+                // Show loading state
+                if (duplicatesBtn) {
+                    duplicatesBtn.textContent = '⏳ Checking...';
+                    duplicatesBtn.disabled = true;
+                }
+                
                 const response = await fetch('/api/check-duplicates', {
                     method: 'POST'
                 });
@@ -1283,8 +1455,97 @@
             } catch (error) {
                 console.error('Error checking duplicates:', error);
                 alert('Error checking duplicates');
+            } finally {
+                // Restore button state
+                if (duplicatesBtn) {
+                    duplicatesBtn.textContent = originalText;
+                    duplicatesBtn.disabled = false;
+                }
             }
         }
+        
+        // Unlock music
+        async function unlockMusic() {
+            // Get button reference properly - try multiple methods
+            let unlockBtn = null;
+            try {
+                unlockBtn = document.querySelector('button[onclick="unlockMusic()"]') || 
+                           document.querySelector('.header-btn:nth-child(1)') ||
+                           Array.from(document.querySelectorAll('.header-btn')).find(btn => btn.textContent.includes('Unlock'));
+            } catch (e) {
+                console.warn('Could not find unlock button:', e);
+            }
+            
+            const originalText = unlockBtn ? unlockBtn.textContent : 'Unlock Music';
+            
+            try {
+                // Show loading state if button found
+                if (unlockBtn) {
+                    unlockBtn.textContent = '⏳ Unlocking...';
+                    unlockBtn.disabled = true;
+                }
+                
+                const response = await fetch('/api/unlock-music', {
+                    method: 'POST'
+                });
+                if (!response.ok) {
+                    throw new Error('Failed to unlock music');
+                }
+                const result = await response.json();
+                
+                if (result.success) {
+                    let message = `Music unlock completed!\n\n`;
+                    message += `Files processed: ${result.processed_files}\n`;
+                    message += `Successfully unlocked: ${result.successful_unlocks}\n`;
+                    message += `Failed unlocks: ${result.failed_unlocks}\n`;
+                    message += `Files moved to New folder: ${result.moved_to_new}\n`;
+                    message += `(Original encrypted files kept in Unlocked folder)\n`;
+                    
+                    // Add performance metrics if available
+                    if (result.performance) {
+                        const perf = result.performance;
+                        message += `\n📊 Performance:\n`;
+                        message += `• Processing time: ${perf.elapsed_seconds.toFixed(2)}s\n`;
+                        message += `• Speed: ${perf.files_per_second.toFixed(2)} files/sec\n`;
+                        message += `• Average time per file: ${perf.avg_time_per_file.toFixed(2)}s\n`;
+                        message += `• Workers used: ${perf.workers_used} (CPU cores: ${perf.cpu_cores})\n`;
+                        
+                        // Show speedup estimation
+                        const singleThreadEstimate = perf.avg_time_per_file * result.processed_files;
+                        const speedup = singleThreadEstimate / perf.elapsed_seconds;
+                        if (speedup > 1.2) {
+                            message += `• Multi-threading speedup: ${speedup.toFixed(1)}x faster\n`;
+                        }
+                    }
+                    
+                    if (result.failed_files && result.failed_files.length > 0) {
+                        message += `\nFailed files:\n`;
+                        result.failed_files.forEach(file => {
+                            message += `- ${file.file}: ${file.error}\n`;
+                        });
+                    }
+                    
+                    if (result.successful_unlocks > 0) {
+                        message += `\nDecrypted files are now in the New folder and ready to be added to your library.`;
+                    }
+                    
+                    alert(message);
+                } else {
+                    alert(`Error unlocking music: ${result.error}`);
+                }
+            } catch (error) {
+                console.error('Error unlocking music:', error);
+                alert('Error unlocking music files');
+            } finally {
+                // Restore button state if button was found
+                if (unlockBtn) {
+                    unlockBtn.textContent = originalText;
+                    unlockBtn.disabled = false;
+                }
+            }
+        }
+        
+
         
         // Add event listeners for filter changes
         document.addEventListener('DOMContentLoaded', function() {

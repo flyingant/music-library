@@ -75,7 +75,7 @@ if exist "requirements.txt" (
     if %errorlevel% neq 0 (
         echo WARNING: Failed to install dependencies from requirements.txt!
         echo Trying to install core dependencies manually...
-        pip install flask flask-cors mutagen pillow
+        pip install flask flask-cors mutagen pillow cryptography requests
         if %errorlevel% neq 0 (
             echo ERROR: Failed to install dependencies!
             pause
@@ -85,7 +85,7 @@ if exist "requirements.txt" (
     echo Dependencies installed successfully!
 ) else (
     echo WARNING: requirements.txt not found, installing core dependencies...
-    pip install flask flask-cors mutagen pillow
+    pip install flask flask-cors mutagen pillow cryptography requests
     if %errorlevel% neq 0 (
         echo ERROR: Failed to install core dependencies!
         pause
@@ -98,11 +98,11 @@ echo.
 REM Function to check dependencies
 :check_dependencies
 echo Checking dependencies...
-python -c "import flask, flask_cors, mutagen, PIL" 2>nul
+python -c "import flask, flask_cors, mutagen, PIL, cryptography, requests" 2>nul
 if %errorlevel% neq 0 (
     echo ERROR: Missing dependencies detected!
     echo Installing required packages...
-    pip install flask flask-cors mutagen pillow
+    pip install flask flask-cors mutagen pillow cryptography requests
     if %errorlevel% neq 0 (
         echo ERROR: Failed to install dependencies!
         pause
@@ -120,6 +120,7 @@ if not exist "Library" mkdir Library
 if not exist "New" mkdir New
 if not exist "Duplicate" mkdir Duplicate
 if not exist "Trash" mkdir Trash
+if not exist "Unlocked" mkdir Unlocked
 cd "%SCRIPT_DIR%"
 if not exist "thumbnails" mkdir thumbnails
 echo Directories created successfully!

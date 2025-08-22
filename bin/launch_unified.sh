@@ -75,7 +75,7 @@ install_requirements() {
         if [ $? -ne 0 ]; then
             echo "❌ Failed to install dependencies from requirements.txt!"
             echo "Trying to install core dependencies manually..."
-            pip install flask flask-cors mutagen pillow
+            pip install flask flask-cors mutagen pillow cryptography requests
             if [ $? -ne 0 ]; then
                 echo "❌ Failed to install dependencies!"
                 exit 1
@@ -84,7 +84,7 @@ install_requirements() {
         echo "✅ Dependencies installed successfully!"
     else
         echo "⚠️  requirements.txt not found, installing core dependencies..."
-        pip install flask flask-cors mutagen pillow
+        pip install flask flask-cors mutagen pillow cryptography requests
         if [ $? -ne 0 ]; then
             echo "❌ Failed to install core dependencies!"
             exit 1
@@ -96,11 +96,11 @@ install_requirements() {
 # Function to check dependencies
 check_dependencies() {
     echo "🔍 Checking dependencies..."
-    python -c "import flask, flask_cors, mutagen, PIL" 2>/dev/null
+    python -c "import flask, flask_cors, mutagen, PIL, cryptography, requests" 2>/dev/null
     if [ $? -ne 0 ]; then
         echo "❌ Missing dependencies detected!"
         echo "Installing required packages..."
-        pip install flask flask-cors mutagen pillow
+        pip install flask flask-cors mutagen pillow cryptography requests
         if [ $? -ne 0 ]; then
             echo "❌ Failed to install dependencies!"
             exit 1
@@ -113,7 +113,7 @@ check_dependencies() {
 setup_directories() {
     echo "📁 Setting up directories..."
     cd ..
-    mkdir -p Library New Duplicate Trash
+    mkdir -p Library New Duplicate Trash Unlocked
     cd "$SCRIPT_DIR"
     mkdir -p thumbnails  # Thumbnails directory in scripts folder
     echo "✅ Directories created successfully!"
